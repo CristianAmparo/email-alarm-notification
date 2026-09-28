@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Chat Alarm</title>
+    <style>
+      body {
+        margin: 0;
+        background: #1e1e1e;
+        color: white;
+        font-family: "Segoe UI", sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        text-align: center;
+      }
+      h1 { font-size: 20px; margin: 0 0 8px; }
+      p { margin: 4px 0; max-width: 360px; word-wrap: break-word; }
+      button {
+        margin-top: 18px;
+        background: #d9534f;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 15px;
+        font-weight: bold;
+        padding: 10px 24px;
+        cursor: pointer;
+      }
+      button:hover { background: #c9302c; }
+    </style>
+  </head>
+  <body>
+    <h1 id="ruleName">🔔 Chat Alarm</h1>
+    <p id="title"></p>
+    <p id="body"></p>
+    <button id="stopBtn">Stop Alarm</button>
+    <script src="alarm.js"></script>
+  </body>
+</html>

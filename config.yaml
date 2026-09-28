@@ -1,0 +1,17 @@
+# Rules are checked top to bottom — the first match wins.
+# type: sender  -> value is an exact email address
+# type: domain  -> value is a domain (matches anyone @that-domain.com)
+# type: any     -> matches every email; put this last as a catch-all,
+#                   or delete it if you only want alarms for specific people/groups.
+
+rules:
+  - name: "VIP sender"
+    type: sender
+    value: someone@example.com
+
+  - name: "Work group"
+    type: domain
+    value: synermaxx.com
+
+  # - name: "Everything else"
+  #   type: any
