@@ -9,3 +9,10 @@ function stop() {
 }
 
 document.getElementById("stopBtn").addEventListener("click", stop);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+    e.preventDefault();
+    stop();
+  }
+});
