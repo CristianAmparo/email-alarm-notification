@@ -3,11 +3,18 @@
 async function ensureOffscreenDocument() {
   const has = await chrome.offscreen.hasDocument?.();
   if (has) return;
-  await chrome.offscreen.createDocument({
-    url: "offscreen.html",
-    reasons: ["AUDIO_PLAYBACK"],
-    justification: "Loop an alarm tone until the user dismisses it.",
-  });
+  try {
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: ["AUDIO_PLAYBACK"],
+      justification: "Loop an alarm tone until the user dismisses it.",
+    });
+  } catch (e) {
+    // Two frames (mail.google.com + chat.google.com) can both trigger a
+    // match around the same time; whichever call loses this race just
+    // reuses the offscreen document the other one already created.
+    if (!String(e && e.message).includes("single offscreen document")) throw e;
+  }
 }
 
 async function stopOffscreenDocument() {
@@ -27,9 +34,22 @@ async function centeredBounds(width, height) {
   }
 }
 
+// The same real message can be detected twice — once by Gmail's own
+// Notification() call, once by the DOM watcher — since both run in both
+// frames. Ignore a second match that arrives right after the first.
+let lastAlarmAt = 0;
+const DEDUPE_WINDOW_MS = 4000;
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "chat-alarm-match") {
+      const now = Date.now();
+      if (now - lastAlarmAt < DEDUPE_WINDOW_MS) {
+        sendResponse?.();
+        return;
+      }
+      lastAlarmAt = now;
+
       await ensureOffscreenDocument();
 
       chrome.notifications.create({
