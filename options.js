@@ -109,3 +109,22 @@ document.getElementById("resetSoundBtn").addEventListener("click", async () => {
 });
 
 refreshSoundName();
+
+// --- Auto-stop ---
+
+const DEFAULT_AUTO_STOP_SECONDS = 60;
+const autoStopInput = document.getElementById("autoStopSeconds");
+const autoStopStatus = document.getElementById("autoStopStatus");
+
+(async function initAutoStop() {
+  const { autoStopSeconds } = await chrome.storage.local.get("autoStopSeconds");
+  autoStopInput.value = autoStopSeconds === undefined ? DEFAULT_AUTO_STOP_SECONDS : autoStopSeconds;
+})();
+
+document.getElementById("saveAutoStopBtn").addEventListener("click", async () => {
+  const seconds = Math.max(0, parseInt(autoStopInput.value, 10) || 0);
+  autoStopInput.value = seconds;
+  await chrome.storage.local.set({ autoStopSeconds: seconds });
+  autoStopStatus.textContent = "Saved.";
+  setTimeout(() => (autoStopStatus.textContent = ""), 1500);
+});

@@ -75,6 +75,21 @@
       <audio id="previewAudio"></audio>
     </div>
 
+    <div class="sound-section">
+      <h1>Auto-stop</h1>
+      <p class="hint">
+        Automatically stop the alarm if it's not dismissed manually. Set to
+        0 to disable and let it ring until you click Stop.
+      </p>
+      <label>
+        Auto-stop after
+        <input type="number" id="autoStopSeconds" min="0" step="1" style="width:70px" />
+        seconds
+      </label>
+      <button id="saveAutoStopBtn">Save</button>
+      <span id="autoStopStatus"></span>
+    </div>
+
     <script src="options.js"></script>
   </body>
 </html>

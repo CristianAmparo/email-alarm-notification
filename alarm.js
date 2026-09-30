@@ -16,3 +16,10 @@ document.addEventListener("keydown", (e) => {
     stop();
   }
 });
+
+const DEFAULT_AUTO_STOP_SECONDS = 60;
+
+chrome.storage.local.get("autoStopSeconds", ({ autoStopSeconds }) => {
+  const seconds = autoStopSeconds === undefined ? DEFAULT_AUTO_STOP_SECONDS : autoStopSeconds;
+  if (seconds > 0) setTimeout(stop, seconds * 1000);
+});
