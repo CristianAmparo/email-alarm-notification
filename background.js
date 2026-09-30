@@ -22,6 +22,19 @@ async function stopOffscreenDocument() {
   if (has) await chrome.offscreen.closeDocument();
 }
 
+// Multiple alarm popups can be open at once (separate messages, more than
+// DEDUPE_WINDOW_MS apart). They all share one audio player, so it should
+// only stop once every open alarm window has actually been closed —
+// however the user closes them (Stop button, Enter/Space, or the window's
+// own native close button, none of which reliably message us directly).
+const openAlarmWindowIds = new Set();
+
+chrome.windows.onRemoved.addListener(async (windowId) => {
+  if (!openAlarmWindowIds.has(windowId)) return;
+  openAlarmWindowIds.delete(windowId);
+  if (openAlarmWindowIds.size === 0) await stopOffscreenDocument();
+});
+
 async function centeredBounds(width, height) {
   try {
     const win = await chrome.windows.getLastFocused();
@@ -68,7 +81,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const width = 420;
       const height = 260;
       const { left, top } = await centeredBounds(width, height);
-      chrome.windows.create({
+      const win = await chrome.windows.create({
         url: `alarm.html?${params.toString()}`,
         type: "popup",
         width,
@@ -76,8 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         left,
         top,
       });
-    } else if (message.type === "stop-alarm") {
-      await stopOffscreenDocument();
+      if (win && win.id !== undefined) openAlarmWindowIds.add(win.id);
     } else if (message.type === "get-alarm-sound") {
       const { alarmSoundDataUrl } = await chrome.storage.local.get("alarmSoundDataUrl");
       sendResponse({ alarmSoundDataUrl });

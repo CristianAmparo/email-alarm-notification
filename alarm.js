@@ -4,7 +4,9 @@ document.getElementById("title").textContent = params.get("title") || "";
 document.getElementById("body").textContent = params.get("body") || "";
 
 function stop() {
-  chrome.runtime.sendMessage({ type: "stop-alarm" });
+  // Just close the window — background.js stops the shared audio player
+  // once every open alarm window has closed, however it was closed
+  // (this button, Enter/Space, or the window's own native close button).
   window.close();
 }
 
