@@ -12,11 +12,22 @@
         margin-top: 6px;
         cursor: pointer;
       }
+      #stopAllBtn {
+        background: #d9534f;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
     <h1>🔔 Chat Alarm</h1>
     <p>Watching Gmail for matching chat messages.</p>
+    <button id="stopAllBtn">■ Stop Alarm</button>
+    <p style="font-size:11px;color:#888;">
+      Use this if the alarm is ringing but its popup isn't visible.
+    </p>
     <button id="openOptions">Edit filters</button>
     <script src="popup.js"></script>
   </body>

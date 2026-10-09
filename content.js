@@ -57,11 +57,18 @@ const ROW_SELECTOR = 'span[role="listitem"][data-display-timestamp]';
 const lastSeenTimestamps = new Map(); // row id -> last known data-display-timestamp
 let chatBaselineReady = false; // ignore whatever's already there when we start
 
+// Gmail marks the row of whichever conversation you currently have open
+// with this class instead of the normal "WD3P7" (found by comparing the
+// open row's classes against a closed one). Fragile (an obfuscated class
+// Google could rename), but it's the only signal available right now.
+const SELECTED_ROW_CLASS = "qs41qe";
+
 function processRow(row) {
   const rowId = row.id || row.getAttribute("data-group-id");
   const timestampStr = row.getAttribute("data-display-timestamp");
   if (!rowId || !timestampStr) return;
   const timestamp = Number(timestampStr);
+  const isSelected = row.classList.contains(SELECTED_ROW_CLASS);
 
   const previous = lastSeenTimestamps.get(rowId);
 
@@ -79,7 +86,13 @@ function processRow(row) {
   }
 
   if (timestamp <= previous) return; // not newer than what we already know — also filters duplicate/stale nodes
+
+  // Keep the row's recorded timestamp current even while it's selected —
+  // otherwise leaving it stale here would look like a batch of "new"
+  // messages just arrived the moment you switch to another conversation.
   lastSeenTimestamps.set(rowId, timestamp);
+
+  if (isSelected) return; // currently viewing this conversation — no alarm needed
 
   // Row ids can get recycled for different content when Gmail re-renders
   // the list (switching Home/Thread view, scrolling, etc.), which looks
@@ -100,6 +113,12 @@ function processRow(row) {
     /\bDo not disturb\b/gi,
   ];
   let text = (row.innerText || "").replace(/\s+/g, " ").trim();
+
+  // Your own outgoing message updates the same "last activity" timestamp
+  // as an incoming one — Gmail's own list prefixes your own last message
+  // with "You:" in the preview, so use that to skip self-sent messages.
+  if (/\bYou:/i.test(text)) return;
+
   for (const phrase of NOISE_PHRASES) text = text.replace(phrase, "");
   text = text.replace(/(^|\s)\d+(?=\s|$)/g, " "); // strip standalone unread-count digits
   text = text.replace(/\s+/g, " ").trim();

@@ -38,10 +38,14 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
 async function centeredBounds(width, height) {
   try {
     const win = await chrome.windows.getLastFocused();
-    return {
-      left: Math.round(win.left + (win.width - width) / 2),
-      top: Math.round(win.top + (win.height - height) / 2),
-    };
+    const left = Math.round(win.left + (win.width - width) / 2);
+    const top = Math.round(win.top + (win.height - height) / 2);
+    // A disconnected second monitor can leave stale-but-valid-looking
+    // coordinates that would place the popup somewhere off-screen and
+    // effectively invisible. Fall back to Chrome's own default placement
+    // (on the current display) rather than trust obviously-off values.
+    if (left < -50 || top < -50 || left > 10000 || top > 10000) return {};
+    return { left, top };
   } catch (e) {
     return {};
   }
@@ -94,6 +98,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const { alarmSoundDataUrl } = await chrome.storage.local.get("alarmSoundDataUrl");
       sendResponse({ alarmSoundDataUrl });
       return;
+    } else if (message.type === "force-stop-all") {
+      // Last-resort panic button (toolbar popup) for when an alarm window
+      // doesn't render on screen — closes everything unconditionally,
+      // even if our tracking got out of sync with reality.
+      const ids = [...openAlarmWindowIds];
+      openAlarmWindowIds.clear();
+      for (const id of ids) {
+        try {
+          await chrome.windows.remove(id);
+        } catch (e) {
+          // window may already be gone — fine
+        }
+      }
+      await stopOffscreenDocument();
     }
     sendResponse?.();
   })();
