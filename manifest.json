@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Chat Alarm",
   "version": "1.0.0",
+  "minimum_chrome_version": "116",
   "description": "Rings a loud alarm when a Google Chat message matching your filters arrives in Gmail.",
   "permissions": ["storage", "unlimitedStorage", "offscreen", "notifications"],
   "host_permissions": ["https://mail.google.com/*", "https://chat.google.com/*"],

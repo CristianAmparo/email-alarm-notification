@@ -29,17 +29,42 @@ function matchRule(title, rules) {
   return null;
 }
 
-async function handleMatch(title, body) {
-  const { rules = [] } = await chrome.storage.local.get("rules");
-  const rule = matchRule(title || "", rules);
-  if (!rule) return;
+// Reloading/updating the extension doesn't remove this script from tabs
+// that were already open — the old copy keeps running, but every chrome.*
+// call it makes throws "Extension context invalidated". Detect that and
+// shut this orphaned copy down quietly (refreshing the tab loads the new one).
+let chatListObserver = null;
 
-  chrome.runtime.sendMessage({
-    type: "chat-alarm-match",
-    ruleName: rule.label || rule.value || "Match",
-    title: title || "",
-    body: body || "",
-  });
+function isExtensionContextValid() {
+  try {
+    return !!(chrome.runtime?.id && chrome.storage?.local);
+  } catch (e) {
+    return false;
+  }
+}
+
+function shutDownOrphanedScript() {
+  if (chatListObserver) chatListObserver.disconnect();
+  chatListObserver = null;
+}
+
+async function handleMatch(title, body) {
+  if (!isExtensionContextValid()) return shutDownOrphanedScript();
+  try {
+    const { rules = [] } = await chrome.storage.local.get("rules");
+    const rule = matchRule(title || "", rules);
+    if (!rule) return;
+
+    await chrome.runtime.sendMessage({
+      type: "chat-alarm-match",
+      ruleName: rule.label || rule.value || "Match",
+      title: title || "",
+      body: body || "",
+    });
+  } catch (e) {
+    if (!isExtensionContextValid()) return shutDownOrphanedScript();
+    console.error("[Chat Alarm] failed to send alarm", e);
+  }
 }
 
 // --- Method 1: Gmail's own Notification() calls (relayed from inject.js) ---
@@ -130,6 +155,7 @@ function processRow(row) {
 }
 
 function scanChatRows() {
+  if (!isExtensionContextValid()) return shutDownOrphanedScript();
   const rows = document.querySelectorAll(ROW_SELECTOR);
   console.log("[Chat Alarm] DOM watcher scan:", rows.length, "row(s) found");
   rows.forEach(processRow);
@@ -149,7 +175,8 @@ function startChatListWatcher() {
   scanChatRows(); // baseline pass, no alarms yet
   chatBaselineReady = true;
 
-  new MutationObserver(scheduleScan).observe(document.body, {
+  chatListObserver = new MutationObserver(scheduleScan);
+  chatListObserver.observe(document.body, {
     childList: true,
     subtree: true,
     attributes: true,
@@ -158,6 +185,7 @@ function startChatListWatcher() {
 }
 
 function waitForChatListThenStart() {
+  if (!isExtensionContextValid()) return;
   if (document.querySelector(ROW_SELECTOR)) {
     console.log("[Chat Alarm] DOM watcher: chat list found, starting.");
     startChatListWatcher();

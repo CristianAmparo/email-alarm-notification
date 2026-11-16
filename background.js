@@ -25,14 +25,45 @@ async function stopOffscreenDocument() {
 // Multiple alarm popups can be open at once (separate messages, more than
 // DEDUPE_WINDOW_MS apart). They all share one audio player, so it should
 // only stop once every open alarm window has actually been closed —
-// however the user closes them (Stop button, Enter/Space, or the window's
-// own native close button, none of which reliably message us directly).
-const openAlarmWindowIds = new Set();
+// however it was closed (Stop button, Enter/Space, auto-stop, or the
+// window's own native close button).
+//
+// Don't track the windows in a module-level variable: MV3 service workers
+// are shut down after ~30s idle, which wipes that state, so a window closed
+// later (e.g. by auto-stop) would no longer be recognised and the audio
+// would keep playing. Ask Chrome which alarm pages are open instead.
+const ALARM_PAGE_URL = chrome.runtime.getURL("alarm.html");
 
-chrome.windows.onRemoved.addListener(async (windowId) => {
-  if (!openAlarmWindowIds.has(windowId)) return;
-  openAlarmWindowIds.delete(windowId);
-  if (openAlarmWindowIds.size === 0) await stopOffscreenDocument();
+async function getOpenAlarmWindowIds() {
+  const contexts = await chrome.runtime.getContexts({ contextTypes: ["TAB"] });
+  const tabIds = [
+    ...new Set(
+      contexts
+        .filter(
+          (context) =>
+            context.documentUrl?.startsWith(ALARM_PAGE_URL) &&
+            Number.isInteger(context.tabId)
+        )
+        .map((context) => context.tabId)
+    ),
+  ];
+  const windowIds = await Promise.all(
+    tabIds.map(async (tabId) => {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        return tab.windowId;
+      } catch (error) {
+        if (String(error && error.message).startsWith("No tab with id:")) return undefined;
+        throw error;
+      }
+    })
+  );
+  return [...new Set(windowIds.filter(Number.isInteger))];
+}
+
+chrome.windows.onRemoved.addListener(async () => {
+  const remaining = await getOpenAlarmWindowIds();
+  if (remaining.length === 0) await stopOffscreenDocument();
 });
 
 async function centeredBounds(width, height) {
@@ -85,7 +116,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const width = 420;
       const height = 260;
       const { left, top } = await centeredBounds(width, height);
-      const win = await chrome.windows.create({
+      await chrome.windows.create({
         url: `alarm.html?${params.toString()}`,
         type: "popup",
         width,
@@ -93,7 +124,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         left,
         top,
       });
-      if (win && win.id !== undefined) openAlarmWindowIds.add(win.id);
     } else if (message.type === "get-alarm-sound") {
       const { alarmSoundDataUrl } = await chrome.storage.local.get("alarmSoundDataUrl");
       sendResponse({ alarmSoundDataUrl });
@@ -101,9 +131,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else if (message.type === "force-stop-all") {
       // Last-resort panic button (toolbar popup) for when an alarm window
       // doesn't render on screen — closes everything unconditionally,
-      // even if our tracking got out of sync with reality.
-      const ids = [...openAlarmWindowIds];
-      openAlarmWindowIds.clear();
+      // even if an alarm window is in a bad state.
+      const ids = await getOpenAlarmWindowIds();
       for (const id of ids) {
         try {
           await chrome.windows.remove(id);
